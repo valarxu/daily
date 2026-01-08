@@ -28,25 +28,51 @@ export const TimeGrid: React.FC<TimeGridProps> = ({ tasks, onUpdateTasks, select
     gridRef.current = newGrid;
   }, [tasks]);
 
+  const labels = ['0:00', '4:00', '8:00', '12:00', '16:00', '20:00'];
+
+  // New Logic: 
+  // 6 Rows. Each row represents 4 hours.
+  // 8 Columns. 
+  // Row 0: 0:00 - 4:00. Cols: 0:00, 0:30, 1:00, 1:30, 2:00, 2:30, 3:00, 3:30.
+  // Row 1: 4:00 - 8:00.
+  // ...
+  // This matches the previous 8x6 grid logic where each cell is 30 mins.
+  // Total 48 cells.
+  
   const timeToIdx = (time: string) => {
     const [h, m] = time.split(':').map(Number);
-    return h * 2 + (m >= 30 ? 1 : 0);
+    const totalMinutes = h * 60 + m;
+    const row = Math.floor(totalMinutes / 240); // 4 hours = 240 mins
+    const remainder = totalMinutes % 240;
+    const col = Math.floor(remainder / 30);
+    return row * 8 + col;
   };
 
   const idxToTime = (idx: number) => {
-    const col = Math.floor(idx / 6);
-    const row = idx % 6;
-    const totalMinutes = col * 180 + row * 30;
+    const row = Math.floor(idx / 8);
+    const col = idx % 8;
+    const totalMinutes = row * 240 + col * 30;
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
   };
 
-  const labels = ['0:00', '3:00', '6:00', '9:00', '12:00', '15:00', '18:00', '21:00'];
+  const dragModeRef = useRef<'paint' | 'erase'>('paint');
 
   const handleMouseDown = (idx: number) => {
     if (!selectedTask) return;
     setIsDragging(true);
+    
+    // Determine mode based on initial cell
+    const currentTaskId = gridRef.current[idx];
+    const selectedTaskId = selectedTask._id || selectedTask.name;
+    
+    if (currentTaskId === selectedTaskId) {
+        dragModeRef.current = 'erase';
+    } else {
+        dragModeRef.current = 'paint';
+    }
+    
     applyTaskToCell(idx);
   };
 
@@ -59,14 +85,19 @@ export const TimeGrid: React.FC<TimeGridProps> = ({ tasks, onUpdateTasks, select
   const applyTaskToCell = (idx: number) => {
     if (!selectedTask) return;
     const newGrid = [...gridRef.current];
-    // Use task ID or name as identifier. Ideally ID.
-    // If selectedTask is temporary (not saved yet), it might not have _id.
-    // But store ensures tasks have _id? API response has _id.
-    // If creating new task on fly, we might need a temp ID.
-    // Let's assume selectedTask has _id or we use name as fallback.
     const taskId = selectedTask._id || selectedTask.name;
     
-    newGrid[idx] = taskId;
+    if (dragModeRef.current === 'erase') {
+        // Only erase if it matches our task (optional, or erase anything?)
+        // Usually erase meant "toggle off". So if it matches, set to null.
+        if (newGrid[idx] === taskId) {
+            newGrid[idx] = null;
+        }
+    } else {
+        // Paint mode: overwrite
+        newGrid[idx] = taskId;
+    }
+    
     gridRef.current = newGrid;
     setGridState(newGrid);
   };
@@ -133,48 +164,41 @@ export const TimeGrid: React.FC<TimeGridProps> = ({ tasks, onUpdateTasks, select
   }, [isDragging]); // Dependencies
 
   return (
-    <div className="flex flex-col gap-2">
-        <div className="flex justify-between text-xs text-gray-400 px-1">
-            {labels.map(l => <span key={l}>{l}</span>)}
+    <div className="flex gap-2">
+        {/* Y-axis Labels (Rows) */}
+        <div className="flex flex-col justify-between text-xs text-gray-400 py-1 h-[192px]">
+            {['0:00', '4:00', '8:00', '12:00', '16:00', '20:00'].map(l => <span key={l}>{l}</span>)}
         </div>
-        <div className="grid grid-cols-8 gap-2 select-none">
-            {Array.from({ length: 8 }).map((_, colIdx) => (
-                <div key={colIdx} className="flex flex-col gap-2">
-                    {Array.from({ length: 6 }).map((_, rowIdx) => {
-                        const idx = colIdx * 6 + rowIdx;
-                        const taskId = gridState[idx];
-                        const task = tasks.find(t => t.id === taskId);
-                        // If no saved task, check if this cell matches the temp selected task color
-                        // But wait, the logic below was: if selectedTask is active, show its color?
-                        // No, logic is: gridState stores taskId.
-                        // If taskId is set, show task color.
-                        // If taskId is NOT set (null), show empty.
-                        // BUT, when hovering/dragging, we might want to show preview?
-                        // The original code didn't do preview well, it just applied changes on drag.
-                        // Let's keep it simple: gridState reflects current state.
-                        
-                        const color = task?.color;
-                        
-                        return (
-                            <div
-                                key={idx}
-                                onMouseDown={() => handleMouseDown(idx)}
-                                onMouseEnter={() => handleMouseEnter(idx)}
-                                className={`
-                                    aspect-square rounded border border-gray-200 cursor-pointer transition-colors
-                                    ${!taskId ? 'bg-transparent border-dashed hover:border-blue-300' : 'border-transparent'}
-                                `}
-                                style={{ backgroundColor: taskId ? color : undefined }}
-                                title={`${idxToTime(idx)} - ${idxToTime(idx + 1)}`}
-                            />
-                        );
-                    })}
-                </div>
-            ))}
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-             <div className="w-4 h-4 border border-dashed border-gray-300 rounded"></div>
-             <span className="text-xs text-gray-500">Each cell = 30 minutes</span>
+        
+        <div className="flex flex-col gap-2">
+             <div className="grid grid-cols-8 gap-2 select-none">
+                {/* We render cells linearly, 0-47. CSS Grid handles wrapping. */}
+                {/* Wait, the previous code used nested loops for cols/rows. */}
+                {/* Let's use a flat map for simplicity if we just want 8 cols x 6 rows. */}
+                {Array.from({ length: 48 }).map((_, idx) => {
+                    const taskId = gridState[idx];
+                    const task = tasks.find(t => t.id === taskId);
+                    const color = task?.color;
+                    
+                    return (
+                        <div
+                            key={idx}
+                            onMouseDown={() => handleMouseDown(idx)}
+                            onMouseEnter={() => handleMouseEnter(idx)}
+                            className={`
+                                w-6 h-6 rounded border border-gray-200 cursor-pointer transition-colors
+                                ${!taskId ? 'bg-transparent border-dashed hover:border-blue-300' : 'border-transparent'}
+                            `}
+                            style={{ backgroundColor: taskId ? color : undefined }}
+                            title={`${idxToTime(idx)} - ${idxToTime(idx + 1)}`}
+                        />
+                    );
+                })}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+                 <div className="w-4 h-4 border border-dashed border-gray-300 rounded"></div>
+                 <span className="text-xs text-gray-500">Each cell = 30 minutes</span>
+            </div>
         </div>
     </div>
   );

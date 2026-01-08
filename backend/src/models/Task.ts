@@ -12,6 +12,7 @@ const taskSchema = new Schema<ITask>({
   name: { type: String, required: true },
   color: { type: String, required: true },
   isCommon: { type: Boolean, default: false },
+  cardId: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -11,11 +11,22 @@ interface State {
   updateCard: (id: string, card: Partial<Card>) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
   addTask: (task: Omit<Task, '_id'>) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
   cards: [],
   tasks: [],
+  deleteTask: async (id) => {
+    try {
+      await api.delete(`/tasks/${id}`);
+      set((state) => ({
+        tasks: state.tasks.filter((t) => t._id !== id),
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+  },
   fetchCards: async () => {
     try {
       const cards = await api.get('/cards');
