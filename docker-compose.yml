@@ -1,16 +1,20 @@
 version: '3.8'
 services:
   frontend:
+    container_name: daily-frontend
     build: ./frontend
     ports:
-      - "3000:80"
+      - "3005:80"  # Changed from 3000 to 3005 to avoid conflicts
+    restart: unless-stopped
     depends_on:
       - backend
   
   backend:
+    container_name: daily-backend
     build: ./backend
     ports:
-      - "3001:3001"
+      - "3006:3001" # Changed from 3001 to 3006 to avoid conflicts
+    restart: unless-stopped
     environment:
       - MONGODB_URI=mongodb://mongo:27017/dailyflow
       - PORT=3001
@@ -18,9 +22,11 @@ services:
       - mongo
   
   mongo:
+    container_name: daily-mongo
     image: mongo:6
     ports:
-      - "27017:27017"
+      - "27018:27017" # Changed from 27017 to 27018 to avoid conflicts
+    restart: unless-stopped
     volumes:
       - mongo_data:/data/db
     environment:
