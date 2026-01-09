@@ -35,9 +35,17 @@ export const Home: React.FC = () => {
         </div>
         
         {/* Waterfall Layout */}
-        <div className="columns-1 md:columns-2 gap-8 space-y-8">
-            {cards.map(card => (
-                <div key={card._id} className="break-inside-avoid">
+        <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+            {/* Sort cards: Incomplete first, then by date desc */}
+            {cards
+                .sort((a, b) => {
+                    if (a.isCompleted === b.isCompleted) {
+                        return b.date.localeCompare(a.date);
+                    }
+                    return a.isCompleted ? 1 : -1;
+                })
+                .map(card => (
+                <div key={card._id} className="w-full">
                     <Card 
                         data={card} 
                         onUpdate={(newData) => handleUpdateCard(card._id!, newData)}

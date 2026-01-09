@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card as CardType, Task } from '../../types';
 import { TimeGrid } from './TimeGrid';
 import { useStore } from '../../store/useStore';
-import { Check, Plus, Trash2, X } from 'lucide-react';
+import { Check, Plus, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface CardProps {
@@ -19,6 +19,75 @@ const COLORS = [
 export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
   const { tasks: availableTasks, addTask, deleteTask } = useStore();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  
+  // Collapse state for completed cards
+  const [isExpanded, setIsExpanded] = useState(!data.isCompleted);
+
+  // IME State
+  const [dateInput, setDateInput] = useState(data.date);
+  const [reflectionInput, setReflectionInput] = useState(data.reflection);
+  const [isComposing, setIsComposing] = useState(false);
+
+  React.useEffect(() => {
+    setDateInput(data.date);
+    setReflectionInput(data.reflection);
+  }, [data.date, data.reflection]);
+
+  const handleCompositionStart = () => setIsComposing(true);
+
+  // Debounced Update
+  const debouncedUpdate = React.useRef(
+      (newData: CardType) => {
+          onUpdate(newData);
+      }
+  ).current;
+
+  // We need a real debounce implementation. 
+  // Let's use setTimeout.
+  const updateTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerUpdate = (newData: CardType) => {
+      if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+      }
+      updateTimeoutRef.current = setTimeout(() => {
+          onUpdate(newData);
+      }, 500); // 500ms delay
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setIsComposing(false);
+    const newValue = e.currentTarget.value;
+    
+    if (e.currentTarget instanceof HTMLInputElement) {
+        setDateInput(newValue);
+        triggerUpdate({ ...data, date: newValue });
+    } else {
+        setReflectionInput(newValue);
+        triggerUpdate({ ...data, reflection: newValue });
+    }
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setDateInput(newValue);
+    if (!isComposing) {
+        triggerUpdate({ ...data, date: newValue });
+    }
+  };
+
+  const handleReflectionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setReflectionInput(newValue);
+    if (!isComposing) {
+        triggerUpdate({ ...data, reflection: newValue });
+    }
+  };
+
+  // Auto-collapse when completed, expand when incomplete (only if not manually toggled)
+  // Actually, let's just use data.isCompleted to determine default, but allow toggle.
+  // We can sync isExpanded with !isCompleted initially or when isCompleted changes?
+  // Let's keep it simple: If completed, show summary by default. Clicking it expands it.
   
   // New Task State
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -46,9 +115,32 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
     setIsAddingTask(false);
   };
 
+  // If completed and not expanded, show summary view
+  if (data.isCompleted && !isExpanded) {
+      return (
+        <div 
+            onClick={() => setIsExpanded(true)}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 w-full flex items-center justify-between cursor-pointer hover:shadow-md transition-all group"
+        >
+            <div className="flex items-center gap-4">
+                <div className="bg-green-100 text-green-600 p-2 rounded-full">
+                    <Check className="w-5 h-5" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-gray-800">{data.date}</h3>
+                    <p className="text-xs text-gray-500">{data.tasks.length} tasks recorded</p>
+                </div>
+            </div>
+            <div className="text-gray-400 group-hover:text-blue-500">
+                <ChevronDown className="w-5 h-5" />
+            </div>
+        </div>
+      );
+  }
+
   return (
     <div className={cn(
-        "bg-white rounded-2xl shadow-sm border border-gray-100 p-6 w-full flex flex-col gap-6 transition-all hover:shadow-lg",
+        "bg-white rounded-2xl shadow-sm border border-gray-100 p-6 w-full flex flex-col gap-6 transition-all hover:shadow-lg relative",
         data.isCompleted && "ring-2 ring-green-500 ring-offset-2"
     )}>
       {/* Header: Date and Status */}
@@ -56,8 +148,10 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
         <div className="flex flex-col gap-1">
             <input 
                 type="text" 
-                value={data.date} 
-                onChange={(e) => onUpdate({ ...data, date: e.target.value })}
+                value={dateInput} 
+                onChange={handleDateChange}
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
                 placeholder="YYYYMMDD"
                 className="text-2xl font-bold bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-blue-500 focus:outline-none w-40 transition-colors"
             />
@@ -65,7 +159,11 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
         
         <div className="flex items-center gap-2">
             <button 
-                onClick={() => onUpdate({ ...data, isCompleted: !data.isCompleted })}
+                onClick={() => {
+                    const newStatus = !data.isCompleted;
+                    onUpdate({ ...data, isCompleted: newStatus });
+                    if (newStatus) setIsExpanded(false); // Collapse when marked complete
+                }}
                 className={cn(
                     "p-2 rounded-full transition-colors",
                     data.isCompleted ? "text-green-500 bg-green-50 hover:bg-green-100" : "text-gray-300 hover:text-green-500 hover:bg-gray-50"
@@ -74,6 +172,15 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
             >
                 <Check className="w-5 h-5" />
             </button>
+            {data.isCompleted && (
+                <button 
+                    onClick={() => setIsExpanded(false)}
+                    className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"
+                    title="Collapse"
+                >
+                    <ChevronUp className="w-5 h-5" />
+                </button>
+            )}
             {onDelete && (
                 <button 
                     onClick={onDelete} 
@@ -219,8 +326,10 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
         </div>
 
         <textarea 
-            value={data.reflection}
-            onChange={(e) => onUpdate({ ...data, reflection: e.target.value })}
+            value={reflectionInput}
+            onChange={handleReflectionChange}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             placeholder="What went well today? What could be improved?"
             className="w-full text-sm p-4 bg-gray-50 rounded-xl border border-gray-200 focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none resize-none h-32 transition-all"
         />
