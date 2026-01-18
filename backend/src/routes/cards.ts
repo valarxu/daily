@@ -3,11 +3,24 @@ import Card from '../models/Card.js';
 
 const router = express.Router();
 
-// Get all cards
+// Get cards with pagination
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const cards = await Card.find().sort({ createdAt: -1 });
-    res.json(cards);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 7;
+    const skip = (page - 1) * limit;
+
+    const [cards, total] = await Promise.all([
+      Card.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Card.countDocuments()
+    ]);
+
+    res.json({
+      cards,
+      total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     res.status(500).json({ message: (error as Error).message });
   }

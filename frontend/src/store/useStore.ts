@@ -5,7 +5,10 @@ import { Card, Task } from '../types';
 interface State {
   cards: Card[];
   tasks: Task[];
-  fetchCards: () => Promise<void>;
+  currentPage: number;
+  totalPages: number;
+  totalCards: number;
+  fetchCards: (page?: number, limit?: number) => Promise<void>;
   fetchTasks: () => Promise<void>;
   addCard: (card: Partial<Card>) => Promise<void>;
   updateCard: (id: string, card: Partial<Card>) => Promise<void>;
@@ -17,6 +20,9 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   cards: [],
   tasks: [],
+  currentPage: 1,
+  totalPages: 1,
+  totalCards: 0,
   deleteTask: async (id) => {
     try {
       await api.delete(`/tasks/${id}`);
@@ -27,10 +33,15 @@ export const useStore = create<State>((set, get) => ({
       console.error(e);
     }
   },
-  fetchCards: async () => {
+  fetchCards: async (page = 1, limit = 7) => {
     try {
-      const cards = await api.get('/cards');
-      set({ cards });
+      const response = await api.get(`/cards?page=${page}&limit=${limit}`);
+      set({ 
+        cards: response.cards,
+        currentPage: response.currentPage,
+        totalPages: response.totalPages,
+        totalCards: response.total
+      });
     } catch (e) {
       console.error(e);
     }

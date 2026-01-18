@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { Card } from '../components/Card/Card';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const Home: React.FC = () => {
-  const { cards, fetchCards, fetchTasks, addCard, updateCard, deleteCard } = useStore();
+  const { cards, fetchCards, fetchTasks, addCard, updateCard, deleteCard, currentPage, totalPages } = useStore();
 
   useEffect(() => {
-    fetchCards();
+    fetchCards(1);
     fetchTasks();
   }, []);
 
@@ -54,6 +54,29 @@ export const Home: React.FC = () => {
                 </div>
             ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4 mt-8 pb-20">
+                <button 
+                    onClick={() => fetchCards(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <ChevronLeft className="w-6 h-6 text-gray-600" />
+                </button>
+                <span className="text-sm font-medium text-gray-600">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <button 
+                    onClick={() => fetchCards(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <ChevronRight className="w-6 h-6 text-gray-600" />
+                </button>
+            </div>
+        )}
       </div>
 
       {/* Floating Add Button */}

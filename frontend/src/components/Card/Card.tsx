@@ -12,8 +12,18 @@ interface CardProps {
 }
 
 const COLORS = [
-  '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', 
-  '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#F43F5E'
+  '#EF4444', // Red
+  '#F97316', // Orange
+  '#F59E0B', // Amber
+  '#EAB308', // Yellow
+  '#84CC16', // Lime
+  '#22C55E', // Green
+  '#10B981', // Emerald
+  '#06B6D4', // Cyan
+  '#3B82F6', // Blue
+  '#6366F1', // Indigo
+  '#A855F7', // Purple
+  '#EC4899', // Pink
 ];
 
 export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
@@ -64,7 +74,7 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
         triggerUpdate({ ...data, date: newValue });
     } else {
         setReflectionInput(newValue);
-        triggerUpdate({ ...data, reflection: newValue });
+        // Reflection is only saved when completing the card
     }
   };
 
@@ -79,9 +89,7 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
   const handleReflectionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setReflectionInput(newValue);
-    if (!isComposing) {
-        triggerUpdate({ ...data, reflection: newValue });
-    }
+    // Reflection is only saved when completing the card
   };
 
   // Auto-collapse when completed, expand when incomplete (only if not manually toggled)
@@ -93,6 +101,7 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [isNewTaskCommon, setIsNewTaskCommon] = useState(false);
+  const [newTaskColor, setNewTaskColor] = useState(COLORS[Math.floor(Math.random() * COLORS.length)]);
 
   // Filter tasks: Common tasks OR tasks belonging to this card
   const cardTasks = availableTasks.filter(t => t.isCommon || t.cardId === data._id);
@@ -101,11 +110,9 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
   const handleCreateTask = async () => {
     if (!newTaskName.trim()) return;
     
-    const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-    
     await addTask({
         name: newTaskName,
-        color: randomColor,
+        color: newTaskColor,
         isCommon: isNewTaskCommon,
         cardId: isNewTaskCommon ? undefined : data._id
     });
@@ -113,6 +120,9 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
     setNewTaskName('');
     setIsNewTaskCommon(false);
     setIsAddingTask(false);
+    // Reset color to a new random one for variety, or keep user selection? 
+    // Let's pick a random one for next time so it's not always the same if they add multiple.
+    setNewTaskColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
   };
 
   // If completed and not expanded, show summary view
@@ -161,7 +171,14 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
             <button 
                 onClick={() => {
                     const newStatus = !data.isCompleted;
-                    onUpdate({ ...data, isCompleted: newStatus });
+                    const updateData = { ...data, isCompleted: newStatus };
+                    
+                    // If marking as completed, save the reflection content
+                    if (newStatus) {
+                        updateData.reflection = reflectionInput;
+                    }
+                    
+                    onUpdate(updateData);
                     if (newStatus) setIsExpanded(false); // Collapse when marked complete
                 }}
                 className={cn(
@@ -233,34 +250,53 @@ export const Card = ({ data, onUpdate, onDelete }: CardProps) => {
                     <Plus className="w-4 h-4" /> New Task
                 </button>
             ) : (
-                <div className="flex flex-wrap items-center gap-2 w-full mt-2 p-3 bg-gray-50 rounded-xl border border-gray-200 animate-in fade-in slide-in-from-top-2">
-                    <input 
-                        type="text" 
-                        value={newTaskName}
-                        onChange={(e) => setNewTaskName(e.target.value)}
-                        placeholder="Task name"
-                        className="flex-1 min-w-[120px] text-sm bg-white px-3 py-1.5 rounded border border-gray-200 focus:border-blue-500 outline-none"
-                        autoFocus
-                        onKeyDown={(e) => e.key === 'Enter' && handleCreateTask()}
-                    />
-                    
-                    <div className="flex items-center gap-2 ml-auto">
-                        <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none whitespace-nowrap">
-                            <input 
-                                type="checkbox" 
-                                checked={isNewTaskCommon}
-                                onChange={(e) => setIsNewTaskCommon(e.target.checked)}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            Common?
-                        </label>
+                <div className="flex flex-col gap-2 w-full mt-2 p-3 bg-gray-50 rounded-xl border border-gray-200 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 w-full">
+                        <input 
+                            type="text" 
+                            value={newTaskName}
+                            onChange={(e) => setNewTaskName(e.target.value)}
+                            placeholder="Task name"
+                            className="flex-1 min-w-[120px] text-sm bg-white px-3 py-1.5 rounded border border-gray-200 focus:border-blue-500 outline-none"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreateTask()}
+                        />
+                        
+                        <div className="flex items-center gap-2 ml-auto">
+                            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none whitespace-nowrap">
+                                <input 
+                                    type="checkbox" 
+                                    checked={isNewTaskCommon}
+                                    onChange={(e) => setIsNewTaskCommon(e.target.checked)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                Common?
+                            </label>
 
-                        <button onClick={handleCreateTask} className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-                            <Check className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setIsAddingTask(false)} className="p-1.5 hover:bg-gray-200 text-gray-500 rounded-lg transition-colors">
-                            <X className="w-4 h-4" />
-                        </button>
+                            <button onClick={handleCreateTask} className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                                <Check className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setIsAddingTask(false)} className="p-1.5 hover:bg-gray-200 text-gray-500 rounded-lg transition-colors">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Color Selection */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-200/50">
+                        <span className="text-xs text-gray-400 mr-1">Color:</span>
+                        {COLORS.map(c => (
+                             <button 
+                                 key={c}
+                                 onClick={() => setNewTaskColor(c)}
+                                 className={cn(
+                                     "w-5 h-5 rounded-full transition-all hover:scale-110 border-2 shadow-sm",
+                                     newTaskColor === c ? "border-gray-500 scale-110 ring-1 ring-gray-200" : "border-transparent opacity-80 hover:opacity-100"
+                                 )}
+                                 style={{ backgroundColor: c }}
+                                 title={c}
+                             />
+                        ))}
                     </div>
                 </div>
             )}
