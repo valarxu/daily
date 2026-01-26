@@ -1,14 +1,17 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { Card } from '../components/Card/Card';
+import { ArchiveInput } from '../components/Archive/ArchiveInput';
+import { ArchiveCard } from '../components/Archive/ArchiveCard';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const Home: React.FC = () => {
-  const { cards, fetchCards, fetchTasks, addCard, updateCard, deleteCard, currentPage, totalPages } = useStore();
+  const { cards, archives, fetchCards, fetchTasks, fetchArchives, addCard, updateCard, deleteCard, currentPage, totalPages } = useStore();
 
   useEffect(() => {
     fetchCards(1);
     fetchTasks();
+    fetchArchives();
   }, []);
 
   const handleAddCard = async () => {
@@ -36,6 +39,13 @@ export const Home: React.FC = () => {
         
         {/* Waterfall Layout */}
         <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+            <ArchiveInput />
+            
+            {/* Archived Cards */}
+            {archives.map(archive => (
+              <ArchiveCard key={archive._id} archive={archive} />
+            ))}
+
             {/* Sort cards: Incomplete first, then by date desc */}
             {cards
                 .sort((a, b) => {

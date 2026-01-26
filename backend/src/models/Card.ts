@@ -14,6 +14,7 @@ export interface ICard extends Document {
   tasks: ICardTask[];
   isCompleted: boolean;
   reflection: string;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +33,7 @@ const cardSchema = new Schema<ICard>({
   tasks: [cardTaskSchema],
   isCompleted: { type: Boolean, default: false },
   reflection: { type: String, default: '' },
+  isArchived: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export default mongoose.model<ICard>('Card', cardSchema);

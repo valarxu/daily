@@ -11,8 +11,8 @@ router.get('/', async (req: Request, res: Response) => {
     const skip = (page - 1) * limit;
 
     const [cards, total] = await Promise.all([
-      Card.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
-      Card.countDocuments()
+      Card.find({ isArchived: { $ne: true } }).sort({ date: -1 }).skip(skip).limit(limit),
+      Card.countDocuments({ isArchived: { $ne: true } })
     ]);
 
     res.json({

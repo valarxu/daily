@@ -1,25 +1,30 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
-import { Card, Task } from '../types';
+import { Card, Task, Archive } from '../types';
 
 interface State {
   cards: Card[];
   tasks: Task[];
+  archives: Archive[];
   currentPage: number;
   totalPages: number;
   totalCards: number;
   fetchCards: (page?: number, limit?: number) => Promise<void>;
   fetchTasks: () => Promise<void>;
+  fetchArchives: () => Promise<void>;
   addCard: (card: Partial<Card>) => Promise<void>;
   updateCard: (id: string, card: Partial<Card>) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
   addTask: (task: Omit<Task, '_id'>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  createArchive: (month: string) => Promise<void>;
+  unarchive: (id: string) => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
   cards: [],
   tasks: [],
+  archives: [],
   currentPage: 1,
   totalPages: 1,
   totalCards: 0,
@@ -50,6 +55,14 @@ export const useStore = create<State>((set, get) => ({
     try {
       const tasks = await api.get('/tasks');
       set({ tasks });
+    } catch (e) {
+      console.error(e);
+    }
+  },
+  fetchArchives: async () => {
+    try {
+      const archives = await api.get('/archives');
+      set({ archives });
     } catch (e) {
       console.error(e);
     }
@@ -86,6 +99,29 @@ export const useStore = create<State>((set, get) => ({
     try {
       const newTask = await api.post('/tasks', task);
       set((state) => ({ tasks: [...state.tasks, newTask] }));
+    } catch (e) {
+      console.error(e);
+    }
+  },
+  createArchive: async (month) => {
+    try {
+      const newArchive = await api.post('/archives', { month });
+      set((state) => ({ archives: [newArchive, ...state.archives] }));
+      // Refresh cards to remove archived ones
+      get().fetchCards(get().currentPage);
+    } catch (e) {
+      console.error(e);
+      throw e; // Re-throw to handle in UI
+    }
+  },
+  unarchive: async (id) => {
+    try {
+      await api.put(`/archives/${id}/unarchive`, {});
+      set((state) => ({
+        archives: state.archives.filter((a) => a._id !== id),
+      }));
+      // Refresh cards to show unarchived ones
+      get().fetchCards(get().currentPage);
     } catch (e) {
       console.error(e);
     }
